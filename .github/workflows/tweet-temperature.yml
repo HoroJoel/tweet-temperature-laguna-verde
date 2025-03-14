@@ -1,13 +1,7 @@
-name: Tweet Temperature of Laguna Verde
-
-on:
-  schedule:
-    - cron: '*/30 * * * *'  # Cada 30 minutos
-  workflow_dispatch:  # Permite ejecutarlo manualmente
-
 jobs:
   tweet:
     runs-on: ubuntu-latest
+    environment: TWITTER
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
