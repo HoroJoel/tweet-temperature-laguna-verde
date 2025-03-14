@@ -13,7 +13,10 @@ jobs:
       - name: Debug Secrets
         run: |
           echo "Verificando secretos de Twitter..."
+          if [ -z "${{ secrets.TWITTER_API_KEY }}" ]; then echo "❌ TWITTER_API_KEY está vacío"; exit 1; fi
+          if [ -z "${{ secrets.TWITTER_API_SECRET }}" ]; then echo "❌ TWITTER_API_SECRET está vacío"; exit 1; fi
           if [ -z "${{ secrets.TWITTER_ACCESS_TOKEN }}" ]; then echo "❌ TWITTER_ACCESS_TOKEN está vacío"; exit 1; fi
+          if [ -z "${{ secrets.TWITTER_ACCESS_SECRET }}" ]; then echo "❌ TWITTER_ACCESS_SECRET está vacío"; exit 1; fi
           echo "✅ Todos los secretos están configurados correctamente."
 
       - name: Checkout Repo
@@ -30,39 +33,49 @@ jobs:
 
       - name: Post Tweet using Twitter API v2 (OAuth 2.0 User Context)
         env:
+          TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
+          TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
           TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
         run: |
           echo "Publicando tweet..."
           echo "🌡️ La temperatura actual en Laguna Verde es de ${TEMP} #LagunaVerde #Clima" > tweet.txt
           
-          pip install requests
+          pip install requests requests_oauthlib
 
           python - <<EOF
           import os
           import requests
           import json
+          from requests_oauthlib import OAuth1Session
 
-          # Usamos el Access Token como Bearer Token (OAuth 2.0 User Context)
-          BEARER_TOKEN = os.getenv('TWITTER_ACCESS_TOKEN')
+          # Cargar credenciales de GitHub Secrets
+          API_KEY = os.getenv('TWITTER_API_KEY')
+          API_SECRET = os.getenv('TWITTER_API_SECRET')
+          ACCESS_TOKEN = os.getenv('TWITTER_ACCESS_TOKEN')
+          ACCESS_SECRET = os.getenv('TWITTER_ACCESS_SECRET')
 
-          if not BEARER_TOKEN:
-              print("❌ Error: No hay Bearer Token en las credenciales.")
+          # Verificar que todas las claves existen
+          if not all([API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_SECRET]):
+              print("❌ Error: Faltan credenciales de Twitter.")
               exit(1)
 
-          # Leer el contenido del tweet
-          TWEET_TEXT = open('tweet.txt', 'r').read().strip()
+          # Leer el tweet
+          with open('tweet.txt', 'r') as f:
+              TWEET_TEXT = f.read().strip()
 
-          # Configuración de la API v2
+          # Configurar autenticación con OAuth 1.0a
+          twitter = OAuth1Session(API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_SECRET)
+
+          # Configurar la API de Twitter
           url = "https://api.twitter.com/2/tweets"
-          headers = {
-              "Authorization": f"Bearer {BEARER_TOKEN}",
-              "Content-Type": "application/json"
-          }
+          headers = {"Content-Type": "application/json"}
           payload = json.dumps({"text": TWEET_TEXT})
 
-          # Hacer el POST a la API de Twitter
-          response = requests.post(url, headers=headers, data=payload)
+          # Hacer el POST con autenticación
+          response = twitter.post(url, headers=headers, data=payload)
 
+          # Verificar la respuesta de la API
           if response.status_code == 201:
               print("✅ Tweet enviado correctamente:", TWEET_TEXT)
           else:
