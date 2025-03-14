@@ -13,10 +13,7 @@ jobs:
       - name: Debug Secrets
         run: |
           echo "Verificando secretos de Twitter..."
-          if [ -z "${{ secrets.TWITTER_API_KEY }}" ]; then echo "❌ TWITTER_API_KEY está vacío"; exit 1; fi
-          if [ -z "${{ secrets.TWITTER_API_SECRET }}" ]; then echo "❌ TWITTER_API_SECRET está vacío"; exit 1; fi
           if [ -z "${{ secrets.TWITTER_ACCESS_TOKEN }}" ]; then echo "❌ TWITTER_ACCESS_TOKEN está vacío"; exit 1; fi
-          if [ -z "${{ secrets.TWITTER_ACCESS_SECRET }}" ]; then echo "❌ TWITTER_ACCESS_SECRET está vacío"; exit 1; fi
           echo "✅ Todos los secretos están configurados correctamente."
 
       - name: Checkout Repo
@@ -31,9 +28,9 @@ jobs:
           echo "🌡️ Temperatura obtenida: $TEMP"
           echo "TEMP=$TEMP" >> $GITHUB_ENV
 
-      - name: Post Tweet using Twitter API v2
+      - name: Post Tweet using Twitter API v2 (OAuth 2.0 User Context)
         env:
-          TWITTER_BEARER_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
         run: |
           echo "Publicando tweet..."
           echo "🌡️ La temperatura actual en Laguna Verde es de ${TEMP} #LagunaVerde #Clima" > tweet.txt
@@ -45,14 +42,17 @@ jobs:
           import requests
           import json
 
-          BEARER_TOKEN = os.getenv('TWITTER_BEARER_TOKEN')
+          # Usamos el Access Token como Bearer Token (OAuth 2.0 User Context)
+          BEARER_TOKEN = os.getenv('TWITTER_ACCESS_TOKEN')
 
           if not BEARER_TOKEN:
               print("❌ Error: No hay Bearer Token en las credenciales.")
               exit(1)
 
+          # Leer el contenido del tweet
           TWEET_TEXT = open('tweet.txt', 'r').read().strip()
 
+          # Configuración de la API v2
           url = "https://api.twitter.com/2/tweets"
           headers = {
               "Authorization": f"Bearer {BEARER_TOKEN}",
@@ -60,6 +60,7 @@ jobs:
           }
           payload = json.dumps({"text": TWEET_TEXT})
 
+          # Hacer el POST a la API de Twitter
           response = requests.post(url, headers=headers, data=payload)
 
           if response.status_code == 201:
