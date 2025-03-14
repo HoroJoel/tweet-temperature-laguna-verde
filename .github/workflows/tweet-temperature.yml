@@ -26,10 +26,28 @@ jobs:
         id: fetch_temp
         run: |
           API_URL="https://nginx-cms.onrender.com/api/scraper"
-          TEMP=$(curl -s "$API_URL" | jq -r '.res.temperature' | xargs)  # Extraer y limpiar temperatura
-          if [ -z "$TEMP" ]; then echo "❌ Error: No se pudo obtener la temperatura."; exit 1; fi
+          
+          # Reintentos con espera progresiva (hasta 5 veces con tiempo máximo de 10s por intento)
+          TEMP=""
+          for i in {1..5}; do
+            echo "🔄 Intento $i de 5..."
+            TEMP=$(curl --retry 5 --retry-delay 2 --max-time 15 -s "$API_URL" | jq -r '.temperature' | xargs)
+            
+            if [ -n "$TEMP" ]; then
+              break  # Si obtenemos un valor, salimos del loop
+            fi
+            
+            sleep 3  # Esperar antes del siguiente intento
+          done
+
+          if [ -z "$TEMP" ]; then
+            echo "❌ Error: No se pudo obtener la temperatura después de varios intentos."
+            exit 1
+          fi
+          
           echo "🌡️ Temperatura obtenida: $TEMP"
           echo "TEMP=$TEMP" >> $GITHUB_ENV
+
 
       - name: Post Tweet using Twitter API v2 (OAuth 2.0 User Context)
         env:
