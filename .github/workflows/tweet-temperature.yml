@@ -1,1 +1,71 @@
- sv
+name: Tweet Temperature of Laguna Verde
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'  # Cada 30 minutos
+  workflow_dispatch:  # Permite ejecutarlo manualmente
+
+jobs:
+  tweet:
+    runs-on: ubuntu-latest
+    environment: TWITTER
+    steps:
+      - name: Debug Secrets
+        run: |
+          echo "Verificando secretos de Twitter..."
+          if [ -z "${{ secrets.TWITTER_API_KEY }}" ]; then echo "❌ TWITTER_API_KEY está vacío"; exit 1; fi
+          if [ -z "${{ secrets.TWITTER_API_SECRET }}" ]; then echo "❌ TWITTER_API_SECRET está vacío"; exit 1; fi
+          if [ -z "${{ secrets.TWITTER_ACCESS_TOKEN }}" ]; then echo "❌ TWITTER_ACCESS_TOKEN está vacío"; exit 1; fi
+          if [ -z "${{ secrets.TWITTER_ACCESS_SECRET }}" ]; then echo "❌ TWITTER_ACCESS_SECRET está vacío"; exit 1; fi
+          echo "✅ Todos los secretos están configurados correctamente."
+
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Fetch Temperature from API
+        id: fetch_temp
+        run: |
+          API_URL="https://nginx-cms.onrender.com/api/scraper"
+          TEMP=$(curl -s "$API_URL" | jq -r '.res.temperature' | xargs)  # Extraer y limpiar temperatura
+          if [ -z "$TEMP" ]; then echo "❌ Error: No se pudo obtener la temperatura."; exit 1; fi
+          echo "🌡️ Temperatura obtenida: $TEMP"
+          echo "TEMP=$TEMP" >> $GITHUB_ENV
+
+      - name: Post Tweet
+        env:
+          TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
+          TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
+          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
+        run: |
+          echo "Publicando tweet..."
+          echo "🌡️ La temperatura actual en Laguna Verde es de ${TEMP} #LagunaVerde #Clima" > tweet.txt
+          
+          pip install twython
+          
+          python - <<EOF
+          from twython import Twython
+          import os
+
+          api_key = os.getenv('TWITTER_API_KEY')
+          api_secret = os.getenv('TWITTER_API_SECRET')
+          access_token = os.getenv('TWITTER_ACCESS_TOKEN')
+          access_secret = os.getenv('TWITTER_ACCESS_SECRET')
+
+          # Validar credenciales antes de continuar
+          if not all([api_key, api_secret, access_token, access_secret]):
+              print("❌ Error: Alguna credencial de Twitter está vacía.")
+              exit(1)
+
+          twitter = Twython(api_key, api_secret, access_token, access_secret)
+
+          try:
+              with open('tweet.txt', 'r') as f:
+                  tweet_text = f.read().strip()
+
+              twitter.update_status(status=tweet_text)
+              print("✅ Tweet enviado:", tweet_text)
+          except Exception as e:
+              print("❌ Error al enviar el tweet:", e)
+              exit(1)
+          EOF
