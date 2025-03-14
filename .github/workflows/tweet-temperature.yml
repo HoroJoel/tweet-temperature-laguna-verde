@@ -2,7 +2,9 @@ name: Tweet Temperature of Laguna Verde
 
 on:
   schedule:
-    - cron: '*/30 * * * *'  # Cada 30 minutos
+    - cron: '35 9 * * *'  # 6:35 AM Chile (Santiago) UTC-3
+    - cron: '24 17 * * *' # 2:24 PM Chile (Santiago) UTC-3
+    - cron: '02 22 * * *' # 7:02 PM Chile (Santiago) UTC-3
   workflow_dispatch:  # Permite ejecutarlo manualmente
 
 jobs:
@@ -57,7 +59,7 @@ jobs:
           TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
         run: |
           echo "Publicando tweet..."
-          echo "🌡️ La temperatura actual en Laguna Verde es de ${TEMP} #LagunaVerde #Clima" > tweet.txt
+          echo "🌡️ La temperatura actual en #LagunaVerde es de ${TEMP}C  #Clima" > tweet.txt
           
           pip install requests requests_oauthlib
 
